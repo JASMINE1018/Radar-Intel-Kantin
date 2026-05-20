@@ -29,8 +29,16 @@ $conn->close();
 // Sesuaikan kalau nama file beda
 $fotoMap = [1=>'image1.jpeg',2=>'image2.jpeg',3=>'image3 .jpeg',4=>'image4.jpeg',5=>'image5.jpeg'];
 
-$emojiMap = ['berat'=>'🍛','ringan'=>'🧆','minuman'=>'🧋','dessert'=>'🧇'];
-$labelMap = ['berat'=>'Makanan Berat','ringan'=>'Makanan Ringan','minuman'=>'Minuman','dessert'=>'Dessert'];
+function normalizeKategoriKey($kategori) {
+  $kategori = strtolower(trim((string)$kategori));
+  if (in_array($kategori, ['berat', 'ringan', 'makanan'], true)) return 'makanan';
+  if ($kategori === 'minuman') return 'minuman';
+  if (in_array($kategori, ['dessert', 'jajanan', 'aneka_jajanan'], true)) return 'jajanan';
+  return $kategori ?: 'makanan';
+}
+
+$emojiMap = ['makanan'=>'🍛','minuman'=>'🧋','jajanan'=>'🧇'];
+$labelMap = ['makanan'=>'Makanan','minuman'=>'Minuman','jajanan'=>'Aneka Jajanan'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -294,10 +302,9 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; a
     </div>
     <div class="filter-tabs">
       <button class="ftab active" data-cat="all">Semua</button>
-      <button class="ftab" data-cat="berat">Makanan Berat</button>
-      <button class="ftab" data-cat="ringan">Makanan Ringan</button>
+      <button class="ftab" data-cat="makanan">Makanan</button>
       <button class="ftab" data-cat="minuman">Minuman</button>
-      <button class="ftab" data-cat="dessert">Dessert</button>
+      <button class="ftab" data-cat="jajanan">Aneka Jajanan</button>
     </div>
   </div>
 </div>
@@ -311,13 +318,14 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; a
       </p>
     <?php else: ?>
       <?php foreach ($stands as $i => $stand):
-        $emoji  = $emojiMap[$stand['kategori']] ?? '🍽️';
-        $label  = $labelMap[$stand['kategori']] ?? $stand['kategori'];
+        $kategoriKey = normalizeKategoriKey($stand['kategori']);
+        $emoji  = $emojiMap[$kategoriKey] ?? '🍽️';
+        $label  = $labelMap[$kategoriKey] ?? $stand['kategori'];
         $foto   = $stand['foto'] ?: ($fotoMap[$i+1] ?? '');
         $myRating = $userStandRatings[$stand['id']] ?? 0;
       ?>
       <div class="gcard"
-        data-cat="<?= htmlspecialchars($stand['kategori']) ?>"
+        data-cat="<?= htmlspecialchars($kategoriKey) ?>"
         data-title="<?= htmlspecialchars(strtolower($stand['nama'])) ?>"
         data-id="<?= $stand['id'] ?>"
         style="animation-delay:<?= $i * 0.05 ?>s">
@@ -506,8 +514,16 @@ nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; a
 <script>
 const IS_LOGGED_IN = <?= isLoggedIn() ? 'true' : 'false' ?>;
 const USER_ID = <?= (int)($_SESSION['user_id'] ?? $_SESSION['seller_id'] ?? $_SESSION['owner_id'] ?? 0) ?>;
-const emojiMap = { berat:'🍛', ringan:'🧆', minuman:'🧋', dessert:'🧇' };
-const labelMap = { berat:'Makanan Berat', ringan:'Makanan Ringan', minuman:'Minuman', dessert:'Dessert' };
+const emojiMap = { makanan:'🍛', minuman:'🧋', jajanan:'🧇' };
+const labelMap = { makanan:'Makanan', minuman:'Minuman', jajanan:'Aneka Jajanan' };
+
+function normalizeKategori(kategori) {
+  const value = String(kategori || '').trim().toLowerCase();
+  if (['berat', 'ringan', 'makanan'].includes(value)) return 'makanan';
+  if (value === 'minuman') return 'minuman';
+  if (['dessert', 'jajanan', 'aneka_jajanan'].includes(value)) return 'jajanan';
+  return value || 'makanan';
+}
 
 // Hamburger
 const hamburger  = document.getElementById('hamburger');
@@ -593,13 +609,13 @@ function openModal(standId) {
   fetch(`api/menu.php?stand_id=${standId}&user_id=${USER_ID}`)
     .then(r => r.json()).then(data => {
       if (data.error) { modalItems.innerHTML = `<div class="modal-loading">${data.error}</div>`; return; }
-      const stand = data.stand, emoji = emojiMap[stand.kategori] || '🍽️';
+      const stand = data.stand, kategoriKey = normalizeKategori(stand.kategori), emoji = emojiMap[kategoriKey] || '🍽️';
       const cardEl = document.querySelector(`.gcard[data-id="${standId}"]`);
       const cp = cardEl ? cardEl.querySelector('.gcard-photo') : null;
       if (cp && cp.complete && cp.naturalWidth) { modalHeroImg.src = cp.src; modalHeroImg.style.display = 'block'; modalHeroPlaceholder.textContent = ''; }
       else if (stand.foto) { modalHeroImg.src = stand.foto; modalHeroImg.style.display = 'block'; modalHeroPlaceholder.textContent = ''; }
       else { modalHeroImg.style.display = 'none'; modalHeroPlaceholder.textContent = emoji; }
-      modalTag.textContent = labelMap[stand.kategori] || stand.kategori;
+      modalTag.textContent = labelMap[kategoriKey] || stand.kategori;
       modalTitle.textContent = stand.nama;
       modalStars.innerHTML = buildStarsHtml(stand.rating, 'stand', stand.id, data.my_stand_rating || 0, true);
       if (data.items.length === 0) { modalItems.innerHTML = '<div class="modal-loading">Belum ada menu item.</div>'; return; }
@@ -639,7 +655,8 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
   const $ = id => document.getElementById(id);
 
   // Set basic info dulu (guard if elements missing)
-  const tagEl = $('itemTag'); if (tagEl) tagEl.textContent = labelMap[kategori] || kategori;
+  const kategoriKey = normalizeKategori(kategori);
+  const tagEl = $('itemTag'); if (tagEl) tagEl.textContent = labelMap[kategoriKey] || kategori;
   const nameEl = $('itemName'); if (nameEl) nameEl.textContent = nama;
   const priceEl = $('itemPrice'); if (priceEl) priceEl.textContent = 'Rp ' + Number(harga).toLocaleString('id-ID');
   const avgEl = $('itemAvgStars'); if (avgEl) avgEl.innerHTML = '<span style="color:#aaa;font-size:13px;">Memuat...</span>';
@@ -651,7 +668,7 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
   const phEl  = $('itemModalPlaceholder');
   if (imgEl && phEl) {
     if (foto) { imgEl.src = foto; imgEl.style.display = 'block'; phEl.style.display = 'none'; }
-    else { imgEl.style.display = 'none'; phEl.style.display = 'flex'; phEl.textContent = emojiMap[kategori] || '🍽️'; }
+    else { imgEl.style.display = 'none'; phEl.style.display = 'flex'; phEl.textContent = emojiMap[kategoriKey] || '🍽️'; }
   }
 
   // Reset form (guard)

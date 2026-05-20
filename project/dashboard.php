@@ -55,8 +55,16 @@ if ($stand_ids) {
 
 $conn->close();
 
-$kategori_opts = ['berat'=>'Makanan Berat','ringan'=>'Makanan Ringan','minuman'=>'Minuman','dessert'=>'Dessert'];
-$emoji_map = ['berat'=>'🍛','ringan'=>'🧆','minuman'=>'🧋','dessert'=>'🧇'];
+function normalizeKategoriKey($kategori) {
+  $kategori = strtolower(trim((string)$kategori));
+  if (in_array($kategori, ['berat', 'ringan', 'makanan'], true)) return 'makanan';
+  if ($kategori === 'minuman') return 'minuman';
+  if (in_array($kategori, ['dessert', 'jajanan', 'aneka_jajanan'], true)) return 'jajanan';
+  return $kategori ?: 'makanan';
+}
+
+$kategori_opts = ['makanan'=>'Makanan','minuman'=>'Minuman','jajanan'=>'Aneka Jajanan'];
+$emoji_map = ['makanan'=>'🍛','minuman'=>'🧋','jajanan'=>'🧇'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -305,11 +313,12 @@ body{font-family:'Nunito',sans-serif;background:#0f0f0f;color:#eee;min-height:10
       <?php else: ?>
       <div class="stand-grid">
         <?php foreach ($stands as $stand): ?>
+        <?php $kategoriKey = normalizeKategoriKey($stand['kategori']); ?>
         <div class="stand-card">
           <div class="stand-card-top">
             <div class="stand-info">
               <div class="stand-name"><?= htmlspecialchars($stand['nama']) ?></div>
-              <span class="stand-cat"><?= $kategori_opts[$stand['kategori']] ?? $stand['kategori'] ?></span>
+              <span class="stand-cat"><?= $kategori_opts[$kategoriKey] ?? $stand['kategori'] ?></span>
               <div class="stand-rating">
                 <?php for ($s=1;$s<=5;$s++): ?>
                 <span style="color:<?= $s<=round($stand['rating'])?'#fff':'#333' ?>">★</span>
@@ -318,7 +327,7 @@ body{font-family:'Nunito',sans-serif;background:#0f0f0f;color:#eee;min-height:10
               </div>
             </div>
             <div class="stand-actions">
-              <button class="btn-primary btn-sm btn-edit" onclick="openEditStand(<?= $stand['id'] ?>, '<?= addslashes($stand['nama']) ?>', '<?= $stand['kategori'] ?>', '<?= addslashes($stand['foto'] ?? '') ?>')">Edit</button>
+              <button class="btn-primary btn-sm btn-edit" onclick="openEditStand(<?= $stand['id'] ?>, '<?= addslashes($stand['nama']) ?>', '<?= $kategoriKey ?>', '<?= addslashes($stand['foto'] ?? '') ?>')">Edit</button>
               <button class="btn-primary btn-sm btn-danger" onclick="deleteStand(<?= $stand['id'] ?>)">Hapus</button>
             </div>
           </div>
@@ -354,9 +363,10 @@ body{font-family:'Nunito',sans-serif;background:#0f0f0f;color:#eee;min-height:10
         <div class="empty-dash"><div class="ei">🍽️</div><p>Buat stand dulu sebelum tambah menu</p></div>
       <?php else: ?>
         <?php foreach ($stands as $stand): ?>
+        <?php $kategoriKey = normalizeKategoriKey($stand['kategori']); ?>
         <div class="stand-menu-section">
           <div class="smenu-header" onclick="toggleMenuTable(<?= $stand['id'] ?>)">
-            <div class="smenu-title"><?= $emoji_map[$stand['kategori']] ?? '🍽️' ?> <?= htmlspecialchars($stand['nama']) ?></div>
+            <div class="smenu-title"><?= $emoji_map[$kategoriKey] ?? '🍽️' ?> <?= htmlspecialchars($stand['nama']) ?></div>
             <div class="smenu-toggle" id="toggle-<?= $stand['id'] ?>">▲ tutup</div>
           </div>
           <div id="menu-table-<?= $stand['id'] ?>">
@@ -371,7 +381,7 @@ body{font-family:'Nunito',sans-serif;background:#0f0f0f;color:#eee;min-height:10
             <tbody>
               <?php foreach ($items as $item): ?>
               <tr>
-                <td><span class="item-emoji"><?= $emoji_map[$stand['kategori']] ?? '🍽️' ?></span><span class="item-name-cell"><?= htmlspecialchars($item['nama']) ?></span></td>
+                <td><span class="item-emoji"><?= $emoji_map[$kategoriKey] ?? '🍽️' ?></span><span class="item-name-cell"><?= htmlspecialchars($item['nama']) ?></span></td>
                 <td class="price-cell">Rp <?= number_format($item['harga'],0,',','.') ?></td>
                 <td class="rating-cell"><?= str_repeat('★', round($item['rating'])) ?><span style="color:#333"><?= str_repeat('★', 5-round($item['rating'])) ?></span> <span style="color:#444;font-size:11px;">(<?= $item['rating'] ?>)</span></td>
                 <td style="color:#444;font-family:'Oxanium',sans-serif;font-size:12px;"><?= $item['total_votes'] ?></td>

@@ -30,15 +30,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['error' => 'Item tidak ditemukan']);
         exit;
     }
+
+    $conn->query("CREATE TABLE IF NOT EXISTS review_replies (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        review_id INT NOT NULL UNIQUE,
+        seller_id INT NOT NULL,
+        reply TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_review_id (review_id),
+        INDEX idx_seller_id (seller_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     
     // Fetch reviews
     $stmt = $conn->prepare(
-        "SELECT rv.rating, rv.komentar, rv.created_at, 
+        "SELECT rv.id, rv.rating, rv.komentar, rv.created_at, 
+                rr.reply, rr.created_at AS reply_created_at,
                 COALESCE(u.nama, o.nama) as nama,
                 CASE WHEN u.id IS NOT NULL THEN 'user' ELSE 'owner' END as tipe
          FROM reviews rv
          LEFT JOIN users u ON u.id = rv.user_id
          LEFT JOIN owners o ON o.id = rv.user_id
+         LEFT JOIN review_replies rr ON rr.review_id = rv.id
          WHERE rv.menu_id = ?
          ORDER BY rv.created_at DESC"
     );
@@ -49,11 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $reviews = [];
     while ($row = $reviewResult->fetch_assoc()) {
         $reviews[] = [
+            'id' => (int)$row['id'],
             'nama' => $row['nama'],
             'rating' => (int)$row['rating'],
             'komentar' => $row['komentar'],
             'waktu' => $row['created_at'],
-            'tipe' => $row['tipe']
+            'tipe' => $row['tipe'],
+            'reply' => $row['reply'] ?? null,
+            'reply_waktu' => $row['reply_created_at'] ?? null
         ];
     }
     $stmt->close();

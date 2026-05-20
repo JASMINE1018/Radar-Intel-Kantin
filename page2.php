@@ -73,8 +73,16 @@ $conn->close();
 // Sesuaikan kalau nama file beda
 $fotoMap = [1=>'image1.jpeg',2=>'image2.jpeg',3=>'image3 .jpeg',4=>'image4.jpeg',5=>'image5.jpeg'];
 
-$emojiMap = ['berat'=>'🍛','ringan'=>'🧆','minuman'=>'🧋','dessert'=>'🧇'];
-$labelMap = ['berat'=>'Makanan Berat','ringan'=>'Makanan Ringan','minuman'=>'Minuman','dessert'=>'Dessert'];
+function normalizeKategoriKey($kategori) {
+  $kategori = strtolower(trim((string)$kategori));
+  if (in_array($kategori, ['berat', 'ringan', 'makanan'], true)) return 'makanan';
+  if ($kategori === 'minuman') return 'minuman';
+  if (in_array($kategori, ['dessert', 'jajanan', 'aneka_jajanan'], true)) return 'jajanan';
+  return $kategori ?: 'makanan';
+}
+
+$emojiMap = ['makanan'=>'','minuman'=>'','jajanan'=>''];
+$labelMap = ['makanan'=>'Makanan','minuman'=>'Minuman','jajanan'=>'Aneka Jajanan'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -847,10 +855,9 @@ nav {
     </div>
     <div class="filter-tabs">
       <button class="ftab active" data-cat="all">Semua</button>
-      <button class="ftab" data-cat="berat">Makanan Berat</button>
-      <button class="ftab" data-cat="ringan">Makanan Ringan</button>
+      <button class="ftab" data-cat="makanan">Makanan</button>
       <button class="ftab" data-cat="minuman">Minuman</button>
-      <button class="ftab" data-cat="dessert">Dessert</button>
+      <button class="ftab" data-cat="jajanan">Aneka Jajanan</button>
     </div>
   </div>
 </div>
@@ -864,13 +871,14 @@ nav {
       </p>
     <?php else: ?>
       <?php foreach ($stands as $i => $stand):
-        $emoji  = $emojiMap[$stand['kategori']] ?? '🍽️';
-        $label  = $labelMap[$stand['kategori']] ?? $stand['kategori'];
+        $kategoriKey = normalizeKategoriKey($stand['kategori']);
+        $emoji  = $emojiMap[$kategoriKey] ?? '🍽️';
+        $label  = $labelMap[$kategoriKey] ?? $stand['kategori'];
         $foto = $stand['foto'] ? 'uploads/' . $stand['foto'] : ($fotoMap[$i+1] ?? '');
         $myRating = $userStandRatings[$stand['id']] ?? 0;
       ?>
       <div class="gcard"
-        data-cat="<?= htmlspecialchars($stand['kategori']) ?>"
+        data-cat="<?= htmlspecialchars($kategoriKey) ?>"
         data-title="<?= htmlspecialchars(strtolower($stand['nama'])) ?>"
         data-id="<?= $stand['id'] ?>"
         style="animation-delay:<?= $i * 0.05 ?>s">
@@ -958,7 +966,7 @@ nav {
             <span class="review-count" id="reviewCount">0 reviews</span>
           </div>
 
-          <?php if (isLoggedIn()): ?>
+          <?php if ($isUserLoggedIn || $isOwnerLoggedIn): ?>
           <!-- Form Review -->
           <div class="review-form" id="reviewForm">
             <div class="rf-label">Your Rating</div>
@@ -970,6 +978,10 @@ nav {
             <textarea id="rfKomentar" class="rf-textarea" placeholder="Share your experience..."></textarea>
             <button class="rf-submit" onclick="submitReview()">Post Review</button>
             <div class="rf-msg" id="rfMsg"></div>
+          </div>
+          <?php elseif ($isSellerLoggedIn): ?>
+          <div class="review-seller-note">
+            Anda login sebagai seller. Balas komentar pelanggan di bawah.
           </div>
           <?php else: ?>
           <div class="review-login-prompt">
@@ -1037,18 +1049,32 @@ nav {
 .rf-msg { font-size: 12px; margin-top: 8px; color: #555; font-family: 'Space Grotesk', sans-serif; }
 .rf-msg.ok { color: #1a7a3a; }
 .rf-msg.err { color: #cc0000; }
+.review-seller-note { font-size: 13px; color: #8b7d6f; margin-bottom: 16px; }
 .review-login-prompt { font-size: 13px; color: #8b7d6f; margin-bottom: 16px; }
 .review-login-prompt a { color: #4b601d; font-weight: 700; }
 
 /* Review items */
 .review-item { padding: 14px 0; border-bottom: 1px solid #f0e5d6; }
 .review-item:last-child { border-bottom: none; }
+.review-item[data-has-reply="1"] { padding-bottom: 18px; }
 .ri-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .ri-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: #1f2329; }
 .ri-date { font-size: 11px; color: #aa9a8b; font-family: 'Space Grotesk', sans-serif; }
 .ri-stars { font-size: 13px; color: #c67b35; margin-bottom: 6px; }
 .ri-stars span { color: #dfcfbe; }
 .ri-komentar { font-size: 13px; color: #62584f; line-height: 1.5; }
+.review-seller-reply { margin-top: 10px; padding: 10px 12px; border-left: 3px solid #4b601d; background: #f7f2e7; border-radius: 10px; }
+.seller-reply-label { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #4b601d; margin-bottom: 6px; }
+.seller-reply-text { font-size: 13px; color: #4f443c; line-height: 1.5; }
+.seller-reply-meta { font-size: 11px; color: #9a8b7d; margin-top: 6px; font-family: 'Space Grotesk', sans-serif; }
+.seller-reply-box { margin-top: 12px; padding: 12px; border: 1px solid #e4d3bf; border-radius: 12px; background: #fffdf7; }
+.seller-reply-textarea { width: 100%; min-height: 72px; resize: vertical; border: 1.5px solid #dcc9b2; border-radius: 10px; padding: 10px 12px; font-family: 'Manrope', sans-serif; font-size: 13px; color: #333; background: #fff; outline: none; }
+.seller-reply-textarea:focus { border-color: #4b601d; box-shadow: 0 0 0 3px rgba(75, 96, 29, 0.12); }
+.seller-reply-submit { margin-top: 10px; padding: 10px 16px; background: linear-gradient(135deg, #4b601d, #6f8a34); color: #fff; font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; border: none; border-radius: 999px; cursor: pointer; }
+.seller-reply-submit:hover { filter: brightness(1.05); }
+.seller-reply-msg { font-size: 12px; margin-top: 8px; color: #555; font-family: 'Space Grotesk', sans-serif; }
+.seller-reply-msg.ok { color: #1a7a3a; }
+.seller-reply-msg.err { color: #cc0000; }
 .review-empty { text-align: center; padding: 24px 0; font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #b3a496; letter-spacing: 0.1em; }
 
 @media (max-width: 640px) {
@@ -1059,11 +1085,30 @@ nav {
 
 <script>
 const IS_LOGGED_IN = <?= $isAnyLoggedIn ? 'true' : 'false' ?>;
+const IS_SELLER_LOGGED_IN = <?= $isSellerLoggedIn ? 'true' : 'false' ?>;
 const USER_ID = <?= ($isUserLoggedIn || $isOwnerLoggedIn || $isSellerLoggedIn) ? (int)($isUserLoggedIn ? $_SESSION['user_id'] : ($isOwnerLoggedIn ? $_SESSION['owner_id'] : $_SESSION['seller_id'])) : 0 ?>;
-const emojiMap = { berat:'🍛', ringan:'🧆', minuman:'🧋', dessert:'🧇' };
-const labelMap = { berat:'Makanan Berat', ringan:'Makanan Ringan', minuman:'Minuman', dessert:'Dessert' };
+const emojiMap = { makanan:'🍛', minuman:'🧋', jajanan:'🧇' };
+const labelMap = { makanan:'Makanan', minuman:'Minuman', jajanan:'Aneka Jajanan' };
 const btnAddTray = document.getElementById('btnAddTray');
 let currentTrayItem = null;
+let currentItemMeta = null;
+
+function normalizeKategori(kategori) {
+  const value = String(kategori || '').trim().toLowerCase();
+  if (['berat', 'ringan', 'makanan'].includes(value)) return 'makanan';
+  if (value === 'minuman') return 'minuman';
+  if (['dessert', 'jajanan', 'aneka_jajanan'].includes(value)) return 'jajanan';
+  return value || 'makanan';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Hamburger
 const hamburger  = document.getElementById('hamburger');
@@ -1183,19 +1228,21 @@ function openModal(standId) {
   fetch(`api/menu.php?stand_id=${standId}&user_id=${USER_ID}`)
     .then(r => r.json()).then(data => {
       if (data.error) { modalItems.innerHTML = `<div class="modal-loading">${data.error}</div>`; return; }
-      const stand = data.stand, emoji = emojiMap[stand.kategori] || '🍽️';
+      const stand = data.stand;
+      const kategoriKey = normalizeKategori(stand.kategori);
+      const emoji = emojiMap[kategoriKey] || '🍽️';
       const cardEl = document.querySelector(`.gcard[data-id="${standId}"]`);
       const cp = cardEl ? cardEl.querySelector('.gcard-photo') : null;
       if (cp && cp.complete && cp.naturalWidth) { modalHeroImg.src = cp.src; modalHeroImg.style.display = 'block'; modalHeroPlaceholder.textContent = ''; }
       else if (stand.foto) { modalHeroImg.src = stand.foto; modalHeroImg.style.display = 'block'; modalHeroPlaceholder.textContent = ''; }
       else { modalHeroImg.style.display = 'none'; modalHeroPlaceholder.textContent = emoji; }
-      modalTag.textContent = labelMap[stand.kategori] || stand.kategori;
+      modalTag.textContent = labelMap[kategoriKey] || stand.kategori;
       modalTitle.textContent = stand.nama;
       modalStars.innerHTML = buildStarsHtml(stand.rating, 'stand', stand.id, data.my_stand_rating || 0, true);
       modalRatingNote.textContent = formatStandRatingNote(stand.rating, stand.total_votes);
       if (data.items.length === 0) { renderModalEmptyState(); return; }
       modalItems.innerHTML = data.items.map(item => `
-        <div class="menu-item" onclick="openItemModal(${item.id}, '${item.nama.replace(/'/g,"\\'")}', ${item.harga}, '${stand.kategori}', '${item.foto||''}')">
+        <div class="menu-item" onclick="openItemModal(${item.id}, '${item.nama.replace(/'/g,"\\'")}', ${item.harga}, '${kategoriKey}', '${item.foto||''}')">
           <div class="menu-item-img">${item.foto ? `<img src="${item.foto}" alt="${item.nama}"/>` : emoji}</div>
           <div class="menu-item-info">
             <div class="menu-item-name">${item.nama}</div>
@@ -1206,7 +1253,7 @@ function openModal(standId) {
           </div>
           <div class="menu-item-right">
             <span class="menu-item-price">Rp ${Number(item.harga).toLocaleString('id-ID')}</span>
-            <button class="btn-order" onclick="event.stopPropagation();openItemModal(${item.id},'${item.nama.replace(/'/g,"\\'")}',${item.harga},'${stand.kategori}','${item.foto||''}')">Detail →</button>
+            <button class="btn-order" onclick="event.stopPropagation();openItemModal(${item.id},'${item.nama.replace(/'/g,"\\'")}',${item.harga},'${kategoriKey}','${item.foto||''}')">Detail →</button>
           </div>
         </div>
       `).join('');
@@ -1229,13 +1276,15 @@ const itemModalClose = document.getElementById('itemModalClose');
 function openItemModal(menuId, nama, harga, kategori, foto) {
   currentItemId = menuId;
   reviewStarVal = 0;
+  currentItemMeta = { menuId, nama, harga, kategori, foto };
   currentTrayItem = { menuId, nama, harga, foto, kategori };
   console.log('openItemModal - currentTrayItem set:', currentTrayItem);
   // Safe DOM access helpers
   const $ = id => document.getElementById(id);
 
   // Set basic info (guard if elements missing)
-  const tagEl = $('itemTag'); if (tagEl) tagEl.textContent = labelMap[kategori] || kategori;
+  const kategoriKey = normalizeKategori(kategori);
+  const tagEl = $('itemTag'); if (tagEl) tagEl.textContent = labelMap[kategoriKey] || kategori;
   const nameEl = $('itemName'); if (nameEl) nameEl.textContent = nama;
   const priceEl = $('itemPrice'); if (priceEl) priceEl.textContent = 'Rp ' + Number(harga).toLocaleString('id-ID');
   const avgEl = $('itemAvgStars'); if (avgEl) avgEl.innerHTML = '<span style="color:#aaa;font-size:13px;">Memuat...</span>';
@@ -1248,7 +1297,7 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
   const phEl  = $('itemModalPlaceholder');
   if (imgEl && phEl) {
     if (foto) { imgEl.src = foto; imgEl.style.display = 'block'; phEl.style.display = 'none'; }
-    else { imgEl.style.display = 'none'; phEl.style.display = 'flex'; phEl.textContent = emojiMap[kategori] || '🍽️'; }
+    else { imgEl.style.display = 'none'; phEl.style.display = 'flex'; phEl.textContent = emojiMap[kategoriKey] || '🍽️'; }
   }
 
   // Reset form (guard)
@@ -1280,7 +1329,8 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
         document.querySelectorAll('.rf-star').forEach(s => {
           s.classList.toggle('active', parseInt(s.dataset.val) <= data.my_rating);
         });
-        if (data.my_komentar) document.getElementById('rfKomentar').value = data.my_komentar;
+        const myReviewText = document.getElementById('rfKomentar');
+        if (myReviewText && data.my_komentar) myReviewText.value = data.my_komentar;
       }
 
       // Render reviews
@@ -1288,17 +1338,100 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
         document.getElementById('reviewList').innerHTML = '<div class="review-empty">No reviews yet. Be the first to review!</div>';
       } else {
         document.getElementById('reviewList').innerHTML = data.reviews.map(rv => `
-          <div class="review-item">
+          <div class="review-item" data-review-id="${rv.id}" data-has-reply="${rv.reply ? '1' : '0'}">
             <div class="ri-top">
-              <span class="ri-name">${rv.nama}</span>
-              <span class="ri-date">${rv.waktu}</span>
+              <span class="ri-name">${escapeHtml(rv.nama)}</span>
+              <span class="ri-date">${escapeHtml(rv.waktu)}</span>
             </div>
            <div class="ri-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=Number(rv.rating)?'#111':'#ddd'}">★</span>`).join('')}</div>
-            <div class="ri-komentar">${rv.komentar}</div>
+            <div class="ri-komentar">${escapeHtml(rv.komentar)}</div>
+            ${rv.reply ? `
+              <div class="review-seller-reply">
+                <div class="seller-reply-label">Balasan seller</div>
+                <div class="seller-reply-text">${escapeHtml(rv.reply)}</div>
+                <div class="seller-reply-meta">${escapeHtml(rv.reply_waktu || '')}</div>
+              </div>
+            ` : ''}
+            ${IS_SELLER_LOGGED_IN ? `
+              <div class="seller-reply-box" id="sellerReplyBox-${rv.id}">
+                <textarea class="seller-reply-textarea" id="sellerReply-${rv.id}" placeholder="Tulis balasan sebagai seller...">${escapeHtml(rv.reply || '')}</textarea>
+                <button type="button" class="seller-reply-submit" onclick="submitSellerReply(${rv.id})">${rv.reply ? 'Update Balasan' : 'Kirim Balasan'}</button>
+                <div class="seller-reply-msg" id="sellerReplyMsg-${rv.id}"></div>
+              </div>
+            ` : ''}
           </div>
         `).join('');
       }
     }).catch(() => {});
+}
+
+function submitSellerReply(reviewId) {
+  if (!IS_SELLER_LOGGED_IN) return;
+  const replyEl = document.getElementById(`sellerReply-${reviewId}`);
+  const msgEl = document.getElementById(`sellerReplyMsg-${reviewId}`);
+  const reply = replyEl ? replyEl.value.trim() : '';
+
+  if (!reply) {
+    if (msgEl) {
+      msgEl.className = 'seller-reply-msg err';
+      msgEl.textContent = 'Tulis balasan dulu.';
+    }
+    return;
+  }
+
+  if (msgEl) {
+    msgEl.className = 'seller-reply-msg';
+    msgEl.textContent = 'Mengirim...';
+  }
+
+  const fd = new FormData();
+  fd.append('review_id', reviewId);
+  fd.append('reply', reply);
+
+  fetch('api/review_reply.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        if (msgEl) {
+          msgEl.className = 'seller-reply-msg err';
+          msgEl.textContent = data.error;
+        }
+        return;
+      }
+
+      if (msgEl) {
+        msgEl.className = 'seller-reply-msg ok';
+        msgEl.textContent = 'Balasan seller tersimpan.';
+      }
+
+      const reviewItem = document.querySelector(`.review-item[data-review-id="${reviewId}"]`);
+      const replyBox = document.getElementById(`sellerReplyBox-${reviewId}`);
+      if (reviewItem) {
+        reviewItem.dataset.hasReply = '1';
+        let replyPreview = reviewItem.querySelector('.review-seller-reply');
+        if (!replyPreview) {
+          replyPreview = document.createElement('div');
+          replyPreview.className = 'review-seller-reply';
+          const kom = reviewItem.querySelector('.ri-komentar');
+          if (kom && kom.parentNode) {
+            kom.insertAdjacentElement('afterend', replyPreview);
+          } else {
+            reviewItem.insertBefore(replyPreview, replyBox || null);
+          }
+        }
+        replyPreview.innerHTML = `
+          <div class="seller-reply-label">Balasan seller</div>
+          <div class="seller-reply-text">${escapeHtml(data.reply?.reply || reply)}</div>
+          <div class="seller-reply-meta">${escapeHtml(data.reply?.waktu || '')}</div>
+        `;
+      }
+    })
+    .catch(() => {
+      if (msgEl) {
+        msgEl.className = 'seller-reply-msg err';
+        msgEl.textContent = 'Gagal mengirim balasan.';
+      }
+    });
 }
 
 async function addCurrentItemToTray() {

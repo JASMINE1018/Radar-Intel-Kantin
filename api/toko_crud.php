@@ -25,7 +25,7 @@ function uploadFoto($file, $upload_dir) {
 
 if ($action === 'add') {
     $nama     = trim($_POST['nama'] ?? '');
-    $kategori = $_POST['kategori'] ?? 'berat';
+    $kategori = $_POST['kategori'] ?? 'makanan';
     if (!$nama) { echo json_encode(['error'=>'Nama wajib diisi']); exit; }
 
     $foto = null;
@@ -43,7 +43,7 @@ if ($action === 'add') {
 } elseif ($action === 'edit') {
     $id       = (int)($_POST['id'] ?? 0);
     $nama     = trim($_POST['nama'] ?? '');
-    $kategori = $_POST['kategori'] ?? 'berat';
+    $kategori = $_POST['kategori'] ?? 'makanan';
     if (!$id || !$nama) { echo json_encode(['error'=>'Data tidak valid']); exit; }
 
     // Ambil foto lama
